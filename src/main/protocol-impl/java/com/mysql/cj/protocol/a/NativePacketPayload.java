@@ -69,6 +69,9 @@ public class NativePacketPayload implements Message {
 
     private int position = 0;
 
+    public long currentThread;
+    public long lastThread;
+
     static final int MAX_BYTES_TO_DUMP = 1024;
 
     @Override

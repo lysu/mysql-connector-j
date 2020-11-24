@@ -31,6 +31,7 @@ package com.mysql.cj.protocol.a;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.mysql.cj.Messages;
 import com.mysql.cj.conf.RuntimeProperty;
@@ -46,6 +47,8 @@ public class SimplePacketReader implements MessageReader<NativePacketHeader, Nat
 
     protected SocketConnection socketConnection;
     protected RuntimeProperty<Integer> maxAllowedPacket;
+
+    private AtomicLong lastThreadID = new AtomicLong();
 
     private byte readPacketSequence = -1;
 
@@ -103,6 +106,9 @@ public class SimplePacketReader implements MessageReader<NativePacketHeader, Nat
             } else {
                 buf = new NativePacketPayload(new byte[packetLength]);
             }
+
+            buf.lastThread = this.lastThreadID.get();
+            this.lastThreadID.set(Thread.currentThread().getId());
 
             // Read the data from the server
             int numBytesRead = this.socketConnection.getMysqlInput().readFully(buf.getByteBuffer(), 0, packetLength);

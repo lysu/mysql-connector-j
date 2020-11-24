@@ -30,19 +30,23 @@
 package com.mysql.cj.protocol.a;
 
 import com.mysql.cj.MysqlType;
+import com.mysql.cj.log.Log;
 import com.mysql.cj.protocol.ColumnDefinition;
 import com.mysql.cj.protocol.ProtocolEntityFactory;
 import com.mysql.cj.protocol.ProtocolEntityReader;
 import com.mysql.cj.protocol.a.NativeConstants.IntegerDataType;
 import com.mysql.cj.result.Field;
 import com.mysql.cj.util.LazyString;
+import com.mysql.cj.util.StringUtils;
 
 public class ColumnDefinitionReader implements ProtocolEntityReader<ColumnDefinition, NativePacketPayload> {
 
+    private transient Log log;
     private NativeProtocol protocol;
 
-    public ColumnDefinitionReader(NativeProtocol prot) {
+    public ColumnDefinitionReader(NativeProtocol prot, Log log) {
         this.protocol = prot;
+        this.log = log;
     }
 
     @Override
@@ -73,6 +77,14 @@ public class ColumnDefinitionReader implements ProtocolEntityReader<ColumnDefini
             // next check is needed for SSPS
             if (checkEOF && fieldPacket.isEOFPacket()) {
                 break;
+            }
+            if (fieldPacket.getPayloadLength() == 1) {
+                try {
+                    int bytesToDump = Math.min(1024, fieldPacket.getPayloadLength());
+                    String dump = StringUtils.dumpAsHex(fieldPacket.getByteBuffer(), bytesToDump);
+                    this.log.logError(String.format("%d of %d columns, current tid: %d, last tid: %d, packet-data:\n%s", i, columnCount,
+                            fieldPacket.currentThread, fieldPacket.lastThread, dump));
+                } catch (Exception e) {}
             }
             fields[i] = unpackField(fieldPacket, this.protocol.getServerSession().getCharacterSetMetadata());
         }
