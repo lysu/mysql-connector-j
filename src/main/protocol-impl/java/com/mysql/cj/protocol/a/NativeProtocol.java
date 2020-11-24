@@ -276,13 +276,13 @@ public class NativeProtocol extends AbstractProtocol<NativePacketPayload> implem
         this.authProvider.init(this, this.getPropertySet(), this.socketConnection.getExceptionInterceptor());
 
         Map<Class<? extends ProtocolEntity>, ProtocolEntityReader<? extends ProtocolEntity, NativePacketPayload>> protocolEntityClassToTextReader = new HashMap<>();
-        protocolEntityClassToTextReader.put(ColumnDefinition.class, new ColumnDefinitionReader(this));
+        protocolEntityClassToTextReader.put(ColumnDefinition.class, new ColumnDefinitionReader(this, this.log));
         protocolEntityClassToTextReader.put(ResultsetRow.class, new ResultsetRowReader(this));
         protocolEntityClassToTextReader.put(Resultset.class, new TextResultsetReader(this));
         this.PROTOCOL_ENTITY_CLASS_TO_TEXT_READER = Collections.unmodifiableMap(protocolEntityClassToTextReader);
 
         Map<Class<? extends ProtocolEntity>, ProtocolEntityReader<? extends ProtocolEntity, NativePacketPayload>> protocolEntityClassToBinaryReader = new HashMap<>();
-        protocolEntityClassToBinaryReader.put(ColumnDefinition.class, new ColumnDefinitionReader(this));
+        protocolEntityClassToBinaryReader.put(ColumnDefinition.class, new ColumnDefinitionReader(this, this.log));
         protocolEntityClassToBinaryReader.put(Resultset.class, new BinaryResultsetReader(this));
         this.PROTOCOL_ENTITY_CLASS_TO_BINARY_READER = Collections.unmodifiableMap(protocolEntityClassToBinaryReader);
 
@@ -535,8 +535,8 @@ public class NativeProtocol extends AbstractProtocol<NativePacketPayload> implem
             NativePacketHeader header = this.packetReader.readHeader();
             NativePacketPayload buf = this.packetReader.readMessage(Optional.ofNullable(reuse), header);
             this.packetSequence = header.getMessageSequence();
+            buf.currentThread = Thread.currentThread().getId();
             return buf;
-
         } catch (IOException ioEx) {
             throw ExceptionFactory.createCommunicationsException(this.propertySet, this.serverSession, this.getPacketSentTimeHolder(),
                     this.getPacketReceivedTimeHolder(), ioEx, getExceptionInterceptor());
