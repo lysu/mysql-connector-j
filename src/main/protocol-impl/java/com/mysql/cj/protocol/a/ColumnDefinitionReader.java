@@ -30,12 +30,12 @@
 package com.mysql.cj.protocol.a;
 
 import com.mysql.cj.MysqlType;
-import com.mysql.cj.protocol.ColumnDefinition;
-import com.mysql.cj.protocol.ProtocolEntityFactory;
-import com.mysql.cj.protocol.ProtocolEntityReader;
+import com.mysql.cj.protocol.*;
 import com.mysql.cj.protocol.a.NativeConstants.IntegerDataType;
 import com.mysql.cj.result.Field;
 import com.mysql.cj.util.LazyString;
+import com.mysql.cj.util.StringUtils;
+import java.io.InputStream;
 
 public class ColumnDefinitionReader implements ProtocolEntityReader<ColumnDefinition, NativePacketPayload> {
 
@@ -74,20 +74,58 @@ public class ColumnDefinitionReader implements ProtocolEntityReader<ColumnDefini
             if (checkEOF && fieldPacket.isEOFPacket()) {
                 break;
             }
+            if (fieldPacket.getPayloadLength() == 1) {
+                try {
+                    int bytesToDump = Math.min(1024, fieldPacket.getPayloadLength());
+                    String dump = StringUtils.dumpAsHex(fieldPacket.getByteBuffer(), bytesToDump);
+                    System.err.printf("[DEBUG]%d of %d columns, packet-data:\n%s\n", i, columnCount, dump);
+                    if (this.protocol.packetReader instanceof MultiPacketReader) {
+                        MultiPacketReader mpkReader = (MultiPacketReader) this.protocol.packetReader;
+                        Object rawTimeReader = accessPriv(mpkReader, "packetReader");
+                        if (rawTimeReader instanceof TimeTrackingPacketReader) {
+                            TimeTrackingPacketReader timeReader = (TimeTrackingPacketReader) rawTimeReader;
+                            Object rawSimpleReader = accessPriv(timeReader, "packetReader");
+                            if (rawSimpleReader instanceof SimplePacketReader) {
+                                SimplePacketReader simpleReader = (SimplePacketReader) rawSimpleReader;
+                                SocketConnection socket = (SocketConnection)accessPriv(simpleReader, "socketConnection");
+                                InputStream in = (InputStream)accessParentPriv(socket.getMysqlInput(), "in");
+                                if (in instanceof ReadAheadInputStream) {
+                                    ReadAheadInputStream ahead = (ReadAheadInputStream)in;
+                                    System.err.printf("[DEBUG]read ahead stream cached data:\n%s\n\n", ahead.currentBuff());
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {}
+            }
             fields[i] = unpackField(fieldPacket, this.protocol.getServerSession().getCharacterSetMetadata());
         }
 
         return cdf.createFromFields(fields);
     }
 
+    private Object accessPriv(Object o, String name) throws NoSuchFieldException, IllegalAccessException {
+        Class<?> clazz = o.getClass();
+        java.lang.reflect.Field f = clazz.getDeclaredField(name);
+        f.setAccessible(true);
+        return f.get(o);
+    }
+
+    private Object accessParentPriv(Object o, String name) throws NoSuchFieldException, IllegalAccessException {
+        Class<?> clazz = o.getClass().getSuperclass();
+        java.lang.reflect.Field f = clazz.getDeclaredField(name);
+        f.setAccessible(true);
+        return f.get(o);
+    }
+
     /**
      * Unpacks the Field information from the given packet.
-     * 
+     *
      * @param packet
      *            the packet containing the field information
      * @param characterSetMetadata
      *            encoding of the metadata in the packet
-     * 
+     *
      * @return the unpacked field
      */
     protected Field unpackField(NativePacketPayload packet, String characterSetMetadata) {

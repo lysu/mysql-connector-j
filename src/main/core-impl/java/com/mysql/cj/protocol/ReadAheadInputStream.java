@@ -111,6 +111,16 @@ public class ReadAheadInputStream extends InputStream {
         }
     }
 
+    public synchronized String currentBuff() {
+        StringBuilder debugBuf = new StringBuilder();
+        debugBuf.append("ReadAheadInputStream.readIfNecessary(");
+        byte[] b = new byte[endOfCurrentData];
+        System.arraycopy(this.buf, 0, b, 0, endOfCurrentData);
+        debugBuf.append(Arrays.toString(b));
+        debugBuf.append(")");
+        return debugBuf.toString();
+    }
+
     private int readFromUnderlyingStreamIfNecessary(byte[] b, int off, int len) throws IOException {
         checkClosed();
 
